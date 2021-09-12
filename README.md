@@ -1,10 +1,20 @@
 # Amber Electric Usage Summary
 
-Produces a summary CSV report of an Amber Electric customer's energy consumption
-and cost data.
+This is a command line tool that produces a summary CSV report of an Amber 
+Electric customer's energy consumption and cost data.
+
+You simply need to provide your Amber API token, and the tool will output a CSV
+like this for the last 12 months:
+
+```
+CHANNEL                         , 2020-09-01, 2020-09-02, 2020-09-03, ...
+B4 (FEED_IN) Usage (kWh)        ,      1.351,      0.463,      0.447, ...
+E3 (CONTROLLED_LOAD) Usage (kWh),      2.009,      2.669,      2.757, ...
+E4 (GENERAL) Usage (kWh)        ,     20.400,     20.965,     16.011, ...
+```
 
 
-## Amber Electric
+## About Amber Electric
 
 [Amber Electric](https://amber.com.au/) is an innovative energy retailer in 
 Australia which gives customers access to the wholesale energy price as 
