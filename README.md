@@ -35,6 +35,17 @@ But that's pretty easy.
 [Start here](https://help.amber.com.au/hc/en-us/articles/360038985552-Do-you-have-an-API-).
 
 
+## How To Get The Tool
+
+If you're a programmer comfortable with Git, I'm sure you already know how to
+get this code onto your machine from GitHub.
+
+If you're not familiar with Git, you can download this code as a Zip file
+by clicking on [this link](https://github.com/GrahamLea/amber-usage-summary/archive/refs/heads/main.zip).
+Once it's downloaded, unzip the file, which will create a directory containing
+all the files of this project.
+
+
 ## How To Use It
 
 
