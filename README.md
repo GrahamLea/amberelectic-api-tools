@@ -141,6 +141,17 @@ python  amber_usage_summary.py  2020-07-01  2021-06-30
 ```
 
 
+## Contributions
+
+I'm open to accepting contributions that improve the tool.
+
+If you're planning on altering the code with the intention of contributing the
+changes back, it'd be great to have a chat about it first to check we're on
+the same page about how the improvement might be added.
+It's probably easiest to create an issue describing your planned improvement (and
+being clear that you plan to implement it yourself).
+
+
 ## License
 
 All files in this project are licensed under the 
