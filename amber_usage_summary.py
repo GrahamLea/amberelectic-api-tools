@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Graham Lea
+# Copyright (c) 2022 Graham Lea
 #
 # Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
 # following conditions are met:
@@ -24,9 +24,7 @@ import argparse
 import logging
 import sys
 import traceback
-from datetime import date, timedelta
-from logging import INFO
-from pathlib import Path
+from datetime import date
 from typing import Tuple, Dict, TypeVar
 
 import amberelectric
@@ -36,12 +34,10 @@ from amberelectric.model.usage import Usage
 
 from sites import get_site
 from usage import stream_usage_data
+from util import twelve_months_ago, yesterday, setup_stderr_logging, read_api_token_from_file, ARGUMENT_ERROR_STATUS, \
+    check_python_version, RUNTIME_ERROR_STATUS
 
 T = TypeVar("T")
-
-ARGUMENT_ERROR_STATUS = 2
-CANT_CONTINUE_STATUS = 2
-RUNTIME_ERROR_STATUS = 4
 
 
 class UsageSummary:
@@ -127,14 +123,6 @@ def write_usage_summary_csv(usage_summaries_by_date_and_channel: Dict[Tuple[date
             file.write("\n")
 
 
-def twelve_months_ago() -> date:
-    return (date.today() - timedelta(days=365)).replace(day=1)
-
-
-def yesterday() -> date:
-    return date.today() - timedelta(days=1)
-
-
 def main():
     arg_parser = \
         argparse.ArgumentParser(description="Print daily summaries of Amber Electric usage data as a CSV report")
@@ -179,30 +167,6 @@ def main():
 
     site = get_site(client, site_id)
     write_usage_summary_csv(get_usage_summary(client, site.id, start_date, end_date), include_cost=include_cost)
-
-
-def read_api_token_from_file(arg_parser) -> str:
-    apitoken_file = Path(__file__).parent / "apitoken"
-    if not apitoken_file.exists():
-        arg_parser.print_usage(file=sys.stderr)
-        exit(ARGUMENT_ERROR_STATUS)
-    with open(apitoken_file) as apitoken_in:
-        api_token = apitoken_in.read().strip()
-    logging.info("API token loaded from ./apitoken")
-    return api_token
-
-
-def setup_stderr_logging():
-    stderr_handler = logging.StreamHandler(sys.stderr)
-    stderr_handler.setFormatter(logging.Formatter())
-    logging.root.setLevel(INFO)
-    logging.root.addHandler(stderr_handler)
-
-
-def check_python_version():
-    # It might work with earlier versions, but I haven't tested
-    if sys.version_info[0] < 3 or (sys.version_info[0] == 3 and sys.version_info[1] < 9):
-        raise Exception("You must be using Python 3.9+ to run this tool.")
 
 
 if __name__ == '__main__':

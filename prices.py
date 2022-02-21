@@ -22,30 +22,33 @@
 
 import logging
 from datetime import date
-from typing import List, Iterable
+from typing import List, Iterable, Union
 
 import amberelectric
 from amberelectric.api import AmberApi
-from amberelectric.model.usage import Usage
+from amberelectric.model.actual_interval import ActualInterval
+from amberelectric.model.current_interval import CurrentInterval
+from amberelectric.model.forecast_interval import ForecastInterval
 
 from util import chunked, date_stream
 
 
-def stream_usage_data(client: AmberApi, site_id: str, start_date: date, end_date: date) -> Iterable[Usage]:
+def stream_price_data(client: AmberApi, site_id: str, start_date: date, end_date: date) -> Iterable[ActualInterval]:
     """
-    Uses the given client to query the Amber API for all Usage data for the specified Site between the given dates
-    (both inclusive), and returns a generator that streams Usage objects.
+    Uses the given client to query the Amber API for all Prices data for the specified Site between the given dates
+    (both inclusive), and returns a generator that streams Price Interval objects.
     """
     # Do requests in batches. API couldn't handle large responses in testing. (2021-09-11)
     for date_range in chunked(date_stream(start_date, end_date), 20):
         batch_start = date_range[0]
         batch_end = date_range[-1]
         try:
-            logging.info(f"Retrieving usage: {batch_start} -> {batch_end}")
-            # noinspection PyTypeChecker
-            usage_records: List[Usage] = client.get_usage(site_id, batch_start, batch_end)
+            logging.info(f"Retrieving prices: {batch_start} -> {batch_end}")
+            price_records: List[Union[ActualInterval, CurrentInterval, ForecastInterval]] = \
+                client.get_prices(site_id, start_date=batch_start, end_date=batch_end)
             logging.info("    Done")
-            for ur in usage_records:
-                yield ur
+            for pr in price_records:
+                if isinstance(pr, ActualInterval):
+                    yield pr
         except amberelectric.ApiException as ex:
-            raise RuntimeError(f"We failed to retrieve your Amber usage stats because of an error: {ex}") from ex
+            raise RuntimeError(f"We failed to retrieve your Amber prices because of an error: {ex}") from ex
