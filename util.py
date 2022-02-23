@@ -29,8 +29,9 @@ from typing import List, Iterable, TypeVar
 T = TypeVar("T")
 
 ARGUMENT_ERROR_STATUS = 2
-CANT_CONTINUE_STATUS = 2
+CANT_CONTINUE_STATUS = 3
 RUNTIME_ERROR_STATUS = 4
+INVALID_FILE_FORMAT_STATUS = 5
 
 
 def date_stream(from_date: date, to_date: date) -> Iterable[date]:
@@ -62,6 +63,49 @@ def one_month_ago() -> date:
 
 def yesterday() -> date:
     return date.today() - timedelta(days=1)
+
+
+class YearMonth:
+    year: int
+    month: int
+
+    def __init__(self, year: int, month: int):
+        self.year = year
+        self.month = month
+
+    def first_date(self) -> date:
+        return date(self.year, self.month, 1)
+
+    def last_date(self) -> date:
+        if self.month == 12:
+            return date(self.year + 1, 1, 1) - timedelta(days=1)
+        else:
+            return date(self.year, self.month + 1, 1) - timedelta(days=1)
+
+    def total_days(self) -> int:
+        return (self.last_date() - self.first_date()).days + 1
+
+    def __lt__(self, other):
+        return self.year < other.year or (self.year == other.year and self.month < other.month)
+
+    def __repr__(self):
+        return f"{self.year}-{self.month:02d}"
+
+
+def year_month(year_month_str: str) -> YearMonth:
+    strings = year_month_str.split("-")
+    if len(strings) != 2 or len(strings[0]) != 4 or len(strings[1]) != 2:
+        raise ValueError(f"Invalid YearMonth string: '{year_month_str}'")
+    year = int(strings[0])
+    month = int(strings[1])
+    if year < 2000 or year > 3000 or month < 1 or month > 12:
+        raise ValueError(f"Invalid YearMonth string: '{year_month_str}'")
+    return YearMonth(year, month)
+
+
+def last_year_month() -> YearMonth:
+    last_month = one_month_ago()
+    return YearMonth(last_month.year, last_month.month)
 
 
 def read_api_token_from_file(arg_parser) -> str:

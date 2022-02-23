@@ -22,17 +22,13 @@
 
 import logging
 from operator import attrgetter
-from typing import TypeVar, Optional
+from typing import Optional
 
 import amberelectric
 from amberelectric.api import AmberApi
 from amberelectric.model.site import Site
 
-T = TypeVar("T")
-
-ARGUMENT_ERROR_STATUS = 2
-CANT_CONTINUE_STATUS = 2
-RUNTIME_ERROR_STATUS = 4
+from util import ARGUMENT_ERROR_STATUS, CANT_CONTINUE_STATUS
 
 
 def get_site(client: AmberApi, site_id: Optional[str]) -> Site:

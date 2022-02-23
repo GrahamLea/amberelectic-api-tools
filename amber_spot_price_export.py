@@ -27,7 +27,7 @@ import traceback
 from collections import defaultdict
 from datetime import date
 from operator import attrgetter
-from typing import Tuple, Dict, TypeVar, List
+from typing import Tuple, Dict, List
 
 import amberelectric
 from amberelectric.api import amber_api, AmberApi
@@ -36,13 +36,8 @@ from amberelectric.model.channel import ChannelType
 
 from prices import stream_price_data
 from sites import get_site
-from util import one_month_ago, yesterday, check_python_version, setup_stderr_logging, read_api_token_from_file
-
-T = TypeVar("T")
-
-ARGUMENT_ERROR_STATUS = 2
-CANT_CONTINUE_STATUS = 2
-RUNTIME_ERROR_STATUS = 4
+from util import one_month_ago, yesterday, check_python_version, setup_stderr_logging, read_api_token_from_file, \
+    ARGUMENT_ERROR_STATUS, RUNTIME_ERROR_STATUS
 
 
 def get_prices(client: AmberApi, site_id: str, start_date: date, end_date: date) -> \

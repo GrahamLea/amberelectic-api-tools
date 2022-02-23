@@ -1,0 +1,39 @@
+{
+  distributionLossFactor: 1.0484,
+  components: [
+    {
+      dnspLabel: "Network Energy Prices / Peak",
+      amberLabel: "Network - Peak Energy",
+      periodFilter: ["peak"],
+      centsPerKwh: 25.3719
+    },
+    {
+      dnspLabel: "Network Energy Prices / Shoulder",
+      amberLabel: "Network - Shoulder Energy",
+      periodFilter: ["shoulder"],
+      centsPerKwh: 5.6227
+    },
+    {
+      dnspLabel: "Network Energy Prices / Off-peal",
+      amberLabel: "Network - Off Peak Energy",
+      periodFilter: ["offPeak"],
+      centsPerKwh: 3.6163
+    },
+    {
+      dnspLabel: "Network Access Charge",
+      amberLabel: "Network - Network Access Charge",
+      centsPerDay: 48.7242
+    },
+    {
+      dnspLabel: "Metering Service Charge",
+      amberLabel: "Metering Charge",
+      centsPerDay: 12.674 // = 8.0822 + 4.5918
+    },
+    {
+      dnspLabel: "Metering Service Charge - Generation Systems",
+      amberLabel: "Metering Charge (Feed-In)",
+      feedInFilter: true,
+      centsPerDay: 3.1944 // = 0.830 + 2.3644
+    },
+  ]
+}
