@@ -3,6 +3,7 @@
     "general": "Ausgrid/2021/EA025_Residential_ToU.json5",
     "controlledLoad": "Ausgrid/2021/EA030_Controlled_Load_1.json5",
   },
+  otherCharges: "2021-2022/nsw.json5",
   amberMonthlyFeeInDollarsIncGst: 10,
   greenPowerActive: true,
   marginalLossFactor: 1.0015, // From https://bit.ly/3JRJxsb - need to know your TNI code

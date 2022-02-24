@@ -22,6 +22,11 @@
       centsPerKwh: 0.14528
     },
     {
+      amberLabel: "Market Charges (Embedded Generation Rebate)",
+      channelTypeFilter: ["feedIn"],
+      centsPerKwh: 0.14794  // NOTE: Positive here, even though it's a rebate paid to the customer
+    },
+    {
       amberLabel: "Price Protection Hedging",
       channelTypeFilter: ["general"],
       centsPerKwh: 1.00

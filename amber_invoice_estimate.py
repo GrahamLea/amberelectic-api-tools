@@ -36,11 +36,9 @@ from amberelectric.model.usage import Usage
 from sites import get_site
 from usage import stream_usage_data
 from util import setup_stderr_logging, read_api_token_from_file, check_python_version, RUNTIME_ERROR_STATUS, \
-    year_month, last_year_month, INVALID_FILE_FORMAT_STATUS, CANT_CONTINUE_STATUS
+    year_month, last_year_month, INVALID_FILE_FORMAT_STATUS, CANT_CONTINUE_STATUS, YearMonth
 
 T = TypeVar("T")
-
-AMBER_CHARGES_FILE = "data/otherCharges/2021-2022/nsw.json5"
 
 
 class LineItem:
@@ -51,12 +49,15 @@ class LineItem:
         self.total_cost = total_cost_cents
 
 
+Invoice = Dict[str, List[LineItem]]
+
+
 def read_filter(component_json: dict, filter_property_name: str, filter_type_constructor: Callable[[str], T],
                 usage_attribute_selector: Callable[[Usage], T]) \
         -> Optional[Callable[[Usage], T]]:
     if filter_property_name in component_json:
-        filter = component_json[filter_property_name]
-        filter_vals = {filter_type_constructor(f) for f in filter}
+        filter_text = component_json[filter_property_name]
+        filter_vals = {filter_type_constructor(f) for f in filter_text}
         return lambda usage: usage_attribute_selector(usage) in filter_vals
     else:
         return None
@@ -172,20 +173,34 @@ def main():
         raise SystemExit
     amber_fee_cents_ex_gst = round(amber_fee_dollars_inc_gst * 100 / 1.1)  # Remove GST
 
-    tariff_files_by_channel_type = account_config["tariffsByChannelType"]
+    tariff_files_by_channel_type = account_config.get("tariffsByChannelType")
+    if tariff_files_by_channel_type is None or not isinstance(tariff_files_by_channel_type, dict):
+        logging.critical("ERROR: 'tariffsByChannelType' must be in the account config and be an object mapping"
+                         " Channel Type names to tariffs")
+        exit(INVALID_FILE_FORMAT_STATUS)
+        raise SystemExit
+
     tariff_by_channel_type = dict()
-    for ct, filename in tariff_files_by_channel_type.items():
-        with open("data/tariffs/" + filename) as file_in:
+    for ct, tariff_desc in tariff_files_by_channel_type.items():
+        filename = "data/tariffs/" + tariff_desc
+        with open(filename) as file_in:
             general_tariff = Tariff(json5.load(file_in))
         logging.info(f"Loaded tariff from {filename}")
         tariff_by_channel_type[ct] = general_tariff
 
+    other_charges_desc = account_config["otherCharges"]
+    if other_charges_desc is None or not isinstance(other_charges_desc, str):
+        logging.critical("ERROR: 'otherCharges' must be in the account config and be a string")
+        exit(INVALID_FILE_FORMAT_STATUS)
+        raise SystemExit
+
+    filename = "data/otherCharges/" + other_charges_desc
     try:
-        with open(AMBER_CHARGES_FILE) as file_in:
-            amber_charges = Tariff(json5.load(file_in))
-        logging.info(f"Loaded {AMBER_CHARGES_FILE}")
+        with open(filename) as file_in:
+            other_charges = Tariff(json5.load(file_in))
+        logging.info(f"Loaded {filename}")
     except Exception as ex:
-        logging.critical(f"ERROR: Failed to load or parse {AMBER_CHARGES_FILE}: " + str(ex))
+        logging.critical(f"ERROR: Failed to load or parse {filename}: " + str(ex))
         exit(CANT_CONTINUE_STATUS)
         raise SystemExit
 
@@ -196,20 +211,24 @@ def main():
 
     site = get_site(client, site_id)
 
-    for month in months:
-        logging.critical(f"Calculating {month}")
-        usages: List[Usage] = list(stream_usage_data(client, site.id, month.first_date(), month.last_date()))
-        channel_types = {u.channel_type for u in usages}
+    invoices: Dict[YearMonth, Invoice] = dict()
 
-        invoice: Dict[str, List[LineItem]] = dict()
+    for month in months:
+        logging.critical(f"Calculating invoice for {month}")
+        usages: List[Usage] = list(stream_usage_data(client, site.id, month.first_date(), month.last_date()))
+        general_usages: List[Usage] = list(filter(lambda u: u.channel_type == ChannelType.GENERAL, usages))
+        controlled_usages: List[Usage] = list(filter(lambda u: u.channel_type == ChannelType.CONTROLLED_LOAD, usages))
+        feed_in_usages: List[Usage] = list(filter(lambda u: u.channel_type == ChannelType.FEED_IN, usages))
+        non_feed_in_usages: List[Usage] = general_usages + controlled_usages
+        feed_in_active = len(feed_in_usages) != 0
+
+        invoice = invoices[month] = dict()
         usage_fees = invoice["Usage Fees"] = []
 
         general_tariff = tariff_by_channel_type[ChannelType.GENERAL.value]
         controlled_tariff = tariff_by_channel_type[ChannelType.CONTROLLED_LOAD.value]
-        feed_in_active = ChannelType.FEED_IN in channel_types
 
-        if ChannelType.GENERAL in channel_types:
-            general_usages: List[Usage] = list(filter(lambda u: u.channel_type == ChannelType.GENERAL, usages))
+        if general_usages:
             general_wholesale_total_amount_cents = \
                 round(sum([u.kwh * u.spot_per_kwh for u in general_usages])
                       * general_tariff.distribution_loss_factor
@@ -222,14 +241,12 @@ def main():
                          general_wholesale_total_amount_cents)
             )
 
-        if ChannelType.CONTROLLED_LOAD in channel_types:
-            controlled_usages: List[Usage] = list(
-                filter(lambda u: u.channel_type == ChannelType.CONTROLLED_LOAD, usages))
+        if controlled_usages:
             controlled_wholesale_total_amount_cents = \
                 round(sum([u.kwh * u.spot_per_kwh for u in controlled_usages])
-                    * controlled_tariff.distribution_loss_factor
-                    * marginal_loss_factor
-                    / 1.1)  # Remove GST!
+                      * controlled_tariff.distribution_loss_factor
+                      * marginal_loss_factor
+                      / 1.1)  # Remove GST!
             controlled_wholesale_total_kwh = sum([u.kwh for u in controlled_usages])
             controlled_per_kwh_average_cost = controlled_wholesale_total_amount_cents / controlled_wholesale_total_kwh
             usage_fees.append(
@@ -237,33 +254,33 @@ def main():
                          controlled_wholesale_total_amount_cents)
             )
 
-        if ChannelType.GENERAL in channel_types:
+        if general_usages:
             for component in (c for c in general_tariff.components if c.per_kwh_price_cents):
                 if line_item := create_line_for_component(component.amber_label, month, component, green_power_active,
                                                           feed_in_active, general_usages):
                     usage_fees.append(line_item)
 
-        if ChannelType.CONTROLLED_LOAD in channel_types:
+        if controlled_usages:
             for component in (c for c in controlled_tariff.components if c.per_kwh_price_cents):
                 if line_item := create_line_for_component(component.amber_label, month, component, green_power_active,
                                                           feed_in_active, controlled_usages):
                     usage_fees.append(line_item)
 
-        for component in (c for c in amber_charges.components if c.per_kwh_price_cents):
+        for component in (c for c in other_charges.components if c.per_kwh_price_cents):
             if line_item := create_line_for_component(component.amber_label, month, component, green_power_active,
-                                                      feed_in_active, usages):
+                                                      feed_in_active, non_feed_in_usages):
                 usage_fees.append(line_item)
 
         daily_fees = invoice["Daily Supply Fees"] = []
         # TODO: Metering charges not matching the bill. Why?
         #  https://github.com/amberelectric/public-api/discussions/50#discussioncomment-2235337
-        if ChannelType.GENERAL in channel_types:
+        if general_usages:
             for component in (c for c in general_tariff.components if c.per_day_price_cents):
                 if line_item := create_line_for_component(component.amber_label, month, component, green_power_active,
                                                           feed_in_active, general_usages):
                     daily_fees.append(line_item)
 
-        if ChannelType.CONTROLLED_LOAD in channel_types:
+        if controlled_usages:
             for component in (c for c in controlled_tariff.components if c.per_day_price_cents):
                 if line_item := create_line_for_component(component.amber_label, month, component, green_power_active,
                                                           feed_in_active, controlled_usages):
@@ -275,22 +292,27 @@ def main():
                      amber_fee_cents_ex_gst)
         ]
 
-        if feed_in_active:
-            export_usages: List[Usage] = list(filter(lambda u: u.channel_type == ChannelType.FEED_IN, usages))
-            # TODO: Is there an analogue to DLF/MLF for exports?
-            #  https://github.com/amberelectric/public-api/discussions/50#discussioncomment-2235705
-            export_wholesale_total_amount_cents = round(sum([u.kwh * u.spot_per_kwh for u in export_usages]))
-            export_wholesale_total_kwh = sum([u.kwh for u in export_usages])
+        if feed_in_usages:
+            # NOTE: All Feed-In amounts are calculated as positives, then negated in final line item.
+            export_loss_factor = 1 / (general_tariff.distribution_loss_factor * marginal_loss_factor)
+            export_wholesale_total_amount_cents = \
+                round(sum([u.kwh * u.spot_per_kwh for u in feed_in_usages]) * export_loss_factor)
+
+            # Include feed-in specific market charges in the one export line item
+            for component in (c for c in other_charges.components if c.per_kwh_price_cents):
+                if line_item := create_line_for_component(component.amber_label, month, component, green_power_active,
+                                                          feed_in_active, feed_in_usages):
+                    export_wholesale_total_amount_cents += line_item.total_cost
+
+            export_wholesale_total_kwh = sum([u.kwh for u in feed_in_usages])
             export_per_kwh_average_cost = export_wholesale_total_amount_cents / export_wholesale_total_kwh
-            print(f"export_per_kwh_average_cost: {export_per_kwh_average_cost}")
             invoice["Your Export Credits"] = [
                 LineItem("Solar Exports", export_wholesale_total_kwh, export_per_kwh_average_cost,
                          -export_wholesale_total_amount_cents)
             ]
-        else:
-            export_wholesale_total_amount_cents = 0
 
-        print("-" * 80)
+    for month, invoice in invoices.items():
+        print("\n" + ("-" * 80))
         print(f"Month: {month}")
         total_cents = 0
         for section, items in invoice.items():
@@ -300,11 +322,13 @@ def main():
                       f"   ${item.total_cost / 100:7.2f}")
                 total_cents += item.total_cost
 
-        total_cents = total_cents * 1.1 - (export_wholesale_total_amount_cents * 0.1)  # No GST on exports
+        solar_credits = -invoice["Your Export Credits"][0].total_cost if "Your Export Credits" in invoice else 0
+        gst_cents = round((total_cents - solar_credits) * 0.1)  # No GST on exports
+        total_cents = total_cents + gst_cents
         print(f"\n   TOTAL (incl. GST): ${total_cents / 100:7.2f}\n")
 
 
-def create_line_for_component(label, year_month, component, greenpower_active, feed_in_active, base_usages) \
+def create_line_for_component(label, month, component, greenpower_active, feed_in_active, base_usages) \
         -> Optional[LineItem]:
     # TODO: Should be in the component class!
     if component.greenpower_filter and not component.greenpower_filter(greenpower_active):
@@ -321,7 +345,7 @@ def create_line_for_component(label, year_month, component, greenpower_active, f
         amount = sum([u.kwh for u in filtered_usages])
         unit_price = component.per_kwh_price_cents
     else:
-        amount = year_month.total_days()
+        amount = month.total_days()
         unit_price = component.per_day_price_cents
 
     total_cost_cents = round(amount * unit_price)
