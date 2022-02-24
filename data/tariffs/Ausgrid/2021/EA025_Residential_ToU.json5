@@ -14,7 +14,7 @@
       centsPerKwh: 5.6227
     },
     {
-      dnspLabel: "Network Energy Prices / Off-peal",
+      dnspLabel: "Network Energy Prices / Off-peak",
       amberLabel: "Network - Off Peak Energy",
       periodFilter: ["offPeak"],
       centsPerKwh: 3.6163

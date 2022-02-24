@@ -1,0 +1,63 @@
+{
+  distributionLossFactor: 1.0484,
+  components: [
+    {
+      dnspLabel: "Network Energy Prices / Peak",
+      amberLabel: "Network - Peak Energy",
+      periodFilter: ["peak"],
+      centsPerKwh: 24.5044
+    },
+    {
+      dnspLabel: "Network Energy Prices / Shoulder",
+      amberLabel: "Network - Shoulder Energy",
+      periodFilter: ["shoulder"],
+      centsPerKwh: 3.9269
+    },
+    {
+      dnspLabel: "Network Energy Prices / Off-peak",
+      amberLabel: "Network - Off Peak Energy",
+      periodFilter: ["offPeak"],
+      centsPerKwh: 2.8618
+    },
+    {
+      dnspLabel: "Network Access Charge",
+      amberLabel: "Network - Network Access Charge",
+      centsPerDay: 49.6768
+    },
+    {
+      dnspLabel: "Network Demand Prices - High Season (Summer)",
+      amberLabel: "Network - Peak Demand Charge",  // TODO: I don't know if this is actually Amber's label, also below
+      monthFilter: [11, 12, 1, 2, 3],
+      hourFilter: [14, 15, 16, 17, 18, 19],
+      workingWeekdayFilter: true,
+      centsPerPeakDemandKwPerDay: 4.3294
+    },
+    {
+      dnspLabel: "Network Demand Prices - High Season (Winter)",
+      amberLabel: "Network - Peak Demand Charge",
+      monthFilter: [6, 7, 8],
+      hourFilter: [17, 18, 19, 20],
+      workingWeekdayFilter: true,
+      centsPerPeakDemandKwPerDay: 4.3294
+    },
+    {
+      dnspLabel: "Network Demand Prices - Low Season",
+      amberLabel: "Network - Peak Demand Charge",
+      monthFilter: [4, 5, 9, 10],
+      hourFilter: [17, 18, 19, 20],
+      workingWeekdayFilter: true,
+      centsPerPeakDemandKwPerDay: 4.3294
+    },
+    {
+      dnspLabel: "Metering Service Charge",
+      amberLabel: "Metering Charge",
+      centsPerDay: 4.5918
+    },
+    {
+      dnspLabel: "Metering Service Charge - Generation Systems",
+      amberLabel: "Metering Charge (Feed-In)",
+      feedInFilter: true,
+      centsPerDay: 3.1944 // = 0.830 + 2.3644
+    },
+  ]
+}

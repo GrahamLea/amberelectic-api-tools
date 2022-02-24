@@ -20,10 +20,12 @@
 # WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import logging
+import re
 import sys
 from datetime import date, timedelta
 from logging import INFO
 from pathlib import Path
+from re import Pattern
 from typing import List, Iterable, TypeVar
 
 T = TypeVar("T")
@@ -106,6 +108,32 @@ def year_month(year_month_str: str) -> YearMonth:
 def last_year_month() -> YearMonth:
     last_month = one_month_ago()
     return YearMonth(last_month.year, last_month.month)
+
+
+FRIDAY_ISO_WEEKDAY = 5
+
+
+class TariffCalendar:
+    public_holiday_patterns: List[Pattern]
+
+    def __init__(self, public_holiday_patterns: List[str]) -> None:
+        self.public_holiday_patterns = [re.compile(p) for p in public_holiday_patterns]
+
+    def is_working_weekday(self, dt: date) -> bool:
+        if dt.isoweekday() > FRIDAY_ISO_WEEKDAY:
+            return False
+        # It's a public holiday if this date matches any of the public holiday patterns
+        date_string = dt.isoformat()
+        if any((p.fullmatch(date_string) is not None for p in self.public_holiday_patterns)):
+            return False
+        return True
+
+
+# Need to test TariffCalendar?
+# with open("data/otherCharges/2021-2022/nsw.json5") as file_in:
+#     tc = TariffCalendar(json5.load(file_in)["publicHolidayDatePatterns"])
+#     print(f"tc.is_working_weekday(date(2021, 12, 28)): {tc.is_working_weekday(date(2021, 12, 28))}")
+#     print(f"tc.is_working_weekday(date(2021, 12, 29)): {tc.is_working_weekday(date(2021, 12, 29))}")
 
 
 def read_api_token_from_file(arg_parser) -> str:

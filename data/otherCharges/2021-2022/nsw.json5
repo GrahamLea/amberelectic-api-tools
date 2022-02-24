@@ -31,5 +31,45 @@
       channelTypeFilter: ["general"],
       centsPerKwh: 1.00
     },
-  ]
+  ],
+  publicHolidayDatePatterns: [
+    // NOTE: Currently only comprehensively covers 2021-2023 holidays as gazetted by Feb 2022.
+    // Source: https://www.industrialrelations.nsw.gov.au/public-holidays/public-holidays-in-nsw/
+
+    // These are regular expressions to match dates that are public holidays.
+    //    . = any number in this position
+    //    [456] = 4, 5 or 6 in this position
+
+    // New Year's Day
+    "20..-01-01",
+    "2022-01-03",
+    "2023-01-02",
+
+    // Australia Day
+    "20..-01-26",
+
+    // Good Friday / Easter Monday
+    "2021-04-0[25]",
+    "2022-04-1[58]",
+    "2023-04-07",
+    "2023-04-10",
+
+    // ANZAC Day
+    "20..-04-25",
+
+    // Queen's Birthday
+    "2021-06-14",
+    "2022-06-13",
+    "2023-06-12",
+
+    // Labour Day
+    "2021-10-04",
+    "2022-10-03",
+    "2023-10-02",
+
+    // Christmas & Boxing Days
+    "20..-12-2[56]",
+    "202[12]-12-27",
+    "2021-12-28",
+  ],
 }

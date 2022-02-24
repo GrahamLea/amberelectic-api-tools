@@ -37,14 +37,14 @@ def stream_usage_data(client: AmberApi, site_id: str, start_date: date, end_date
     (both inclusive), and returns a generator that streams Usage objects.
     """
     # Do requests in batches. API couldn't handle large responses in testing. (2021-09-11)
-    for date_range in chunked(date_stream(start_date, end_date), 20):
+    for date_range in chunked(date_stream(start_date, end_date), 10):
         batch_start = date_range[0]
         batch_end = date_range[-1]
         try:
-            logging.info(f"Retrieving usage: {batch_start} -> {batch_end}")
+            logging.info(f"   Retrieving usage: {batch_start} -> {batch_end}")
             # noinspection PyTypeChecker
             usage_records: List[Usage] = client.get_usage(site_id, batch_start, batch_end)
-            logging.info("    Done")
+            logging.info("       Done")
             for ur in usage_records:
                 yield ur
         except amberelectric.ApiException as ex:
