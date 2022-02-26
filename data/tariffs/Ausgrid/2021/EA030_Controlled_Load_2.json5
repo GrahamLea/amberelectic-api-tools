@@ -1,4 +1,5 @@
 {
+  // Source: https://www.ausgrid.com.au/-/media/Documents/Regulation/Pricing/PList/AUSGRID-NETWORK-PRICE-LIST-FY2021-22.pdf
   distributionLossFactor: 1.0519,
   components: [
     {

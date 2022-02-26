@@ -1,31 +1,41 @@
 {
+  // Note: These Other Charges files use the same format as a tariff file, but:
+  // * without the distributionLossFactor
+  // * with an extra publicHolidayDatePatterns section
+
   components: [
+    // State specific. See https://bit.ly/36yA8am (Read the whole conversation!)
     {
       amberLabel: "Environmental Certificate Cost",
       channelTypeFilter: ["general", "controlledLoad"],
       centsPerKwh: 2.006467
     },
+    // From my bill. See https://bit.ly/36yA8am (Read the whole thread!)
     {
       amberLabel: "Carbon Neutral Offset 100%",
       channelTypeFilter: ["general", "controlledLoad"],
       centsPerKwh: 0.22
     },
+    // From my bill. Also available from https://www.amber.com.au/factsheets. Remember to remove GST (divide by 1.1).
     {
       amberLabel: "Greenpower Offset 100%",
       channelTypeFilter: ["general", "controlledLoad"],
       greenPowerFilter: true,
       centsPerKwh: 3.33
     },
+    // State specific. See https://bit.ly/36yA8am (Read the whole conversation!)
     {
       amberLabel: "Market Charges",
       channelTypeFilter: ["general", "controlledLoad"],
       centsPerKwh: 0.14528
     },
+    // State specific. See https://bit.ly/36yA8am (Read the whole conversation!)
     {
       amberLabel: "Market Charges (Embedded Generation Rebate)",
       channelTypeFilter: ["feedIn"],
       centsPerKwh: 0.14794  // NOTE: Positive here, even though it's a rebate paid to the customer
     },
+    // From my bill. State specific. See https://bit.ly/36yA8am (Read the whole conversation!)
     {
       amberLabel: "Price Protection Hedging",
       channelTypeFilter: ["general"],

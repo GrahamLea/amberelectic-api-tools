@@ -1,5 +1,9 @@
 {
   tariffsByChannelType: {
+    // In this section, you should have exactly one tariff for "general" and, if you have a controlled load channel,
+    // one for "controlledLoad".
+    // The value on the right of the channel type must refer to the relative path of a file under data/tariffs.
+
     "general": "Ausgrid/2021/EA025_Residential_ToU.json5",
 //    "general": "Ausgrid/2021/EA111_Residential_Demand_(Introductory).json5",
 //    "general": "Ausgrid/2021/EA115_Residential_ToU_Demand.json5",
@@ -8,10 +12,25 @@
     "controlledLoad": "Ausgrid/2021/EA030_Controlled_Load_1.json5",
 //    "controlledLoad": "Ausgrid/2021/EA030_Controlled_Load_2.json5",
   },
+
+  // The name of your timezone. On a Mac, valid values can usually be found in /usr/share/zoneinfo/Australia
   timezone: "Australia/Sydney",
+
+  // Change to true if you have GreenPower on your account (you should!) ;)
   greenPowerActive: false,
+
+  // The location of the relevant "otherCharges" file for you site, must refer to the relative path of a file under
+  // data/otherCharges.
   otherCharges: "2021-2022/nsw.json5",
+
+  // Your monthly Amber fee, including GST.
+  // Probably $15 if you joined after November 4th 2020.
+  // Currently $10 for people who joined before November 5th 2020 (until at least June 2022).
   amberMonthlyFeeInDollarsIncGst: 10,
-  marginalLossFactor: 1.0015, // From https://bit.ly/3JRJxsb - need to know your TNI
-  smartMeterAccessChargeCentsPerDay: 39.726, // See https://bit.ly/3snfkeu
+
+  // From AEMO at https://bit.ly/3JRJxsb. Need to know your TNI to find your own, though.
+  marginalLossFactor: 1.0015,
+
+  // From Amber. Probably the same for all Ausgrid+IntelliHub customers, but I'm not sure. See https://bit.ly/3snfkeu
+  smartMeterAccessChargeCentsPerDay: 39.726,
 }

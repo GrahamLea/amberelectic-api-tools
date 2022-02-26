@@ -157,7 +157,7 @@ def setup_stderr_logging():
     stderr_handler = logging.StreamHandler(sys.stderr)
     stderr_handler.setFormatter(logging.Formatter())
     logging.root.setLevel(INFO)
-    logging.root.setLevel(DEBUG)
+    # logging.root.setLevel(DEBUG)
     logging.root.addHandler(stderr_handler)
 
 
