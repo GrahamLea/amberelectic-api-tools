@@ -171,7 +171,7 @@ class Tariff:
         total_amount_cents = round(total_fees)
 
         total_kwh = sum([u.kwh for u in usages])
-        per_kwh_average_cost = total_amount_cents / total_kwh
+        per_kwh_average_cost = total_amount_cents / total_kwh if total_kwh else 0
 
         if negate_total:
             total_amount_cents = -total_amount_cents

@@ -20,6 +20,7 @@
 # WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import logging
+import operator
 import sys
 from datetime import date, timedelta
 from logging import INFO, DEBUG
@@ -85,6 +86,12 @@ class YearMonth:
 
     def total_days(self) -> int:
         return (self.last_date() - self.first_date()).days + 1
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, YearMonth) and o.year == self.year and o.month == self.month
+
+    def __hash__(self) -> int:
+        return operator.xor(self.year.__hash__(), self.month.__hash__())
 
     def __lt__(self, other):
         return self.year < other.year or (self.year == other.year and self.month < other.month)

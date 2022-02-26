@@ -27,13 +27,14 @@
     {
       dnspLabel: "Metering Service Charge",
       amberLabel: "Metering Charge",
-      centsPerDay: 12.674 // = 8.0822 + 4.5918
+      centsPerDay: 4.5918 // There are non-capital charges with smart metering: https://bit.ly/3hlac49
     },
-    {
-      dnspLabel: "Metering Service Charge - Generation Systems",
-      amberLabel: "Metering Charge (Feed-In)",
-      feedInFilter: true,
-      centsPerDay: 3.1944 // = 0.830 + 2.3644
-    },
+//  This charge not applied with a smart meter: https://bit.ly/3hlac49
+//    {
+//      dnspLabel: "Metering Service Charge - Generation Systems",
+//      amberLabel: "Metering Charge (Feed-In)",
+//      feedInFilter: true,
+//      centsPerDay: 3.1944 // = 0.830 + 2.3644
+//    },
   ]
 }

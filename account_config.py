@@ -32,6 +32,7 @@ class AccountConfig:
     feed_in_active: bool
     marginal_loss_factor: float
     amber_fee_dollars_inc_gst: float
+    smart_meter_access_charge_cents_per_day: float
 
     def __init__(self,
                  account_timezone: ZoneInfo,
@@ -39,10 +40,12 @@ class AccountConfig:
                  greenpower_active: bool,
                  feed_in_active: bool,
                  marginal_loss_factor: float,
-                 amber_fee_dollars_inc_gst: float):
+                 amber_fee_dollars_inc_gst: float,
+                 smart_meter_access_charge_cents_per_day: float):
         self.account_timezone = account_timezone
         self.calendar = calendar
         self.greenpower_active = greenpower_active
         self.feed_in_active = feed_in_active
         self.marginal_loss_factor = marginal_loss_factor
         self.amber_fee_dollars_inc_gst = amber_fee_dollars_inc_gst
+        self.smart_meter_access_charge_cents_per_day = smart_meter_access_charge_cents_per_day

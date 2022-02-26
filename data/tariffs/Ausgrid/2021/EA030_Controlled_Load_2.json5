@@ -11,10 +11,11 @@
       amberLabel: "Network - Network Access Charge",
       centsPerDay: 11.6309
     },
-    {
-      dnspLabel: "Metering Service Charge",
-      amberLabel: "Metering Charge",
-      centsPerDay: 2.5534 // = 0.2630 + 2.2904
-    },
+//  Metering charges are not applied to extra channels when you have a smart meter: https://bit.ly/3hlac49
+//    {
+//      dnspLabel: "Metering Service Charge",
+//      amberLabel: "Metering Charge",
+//      centsPerDay: 2.5534 // = 0.2630 + 2.2904
+//    },
   ]
 }

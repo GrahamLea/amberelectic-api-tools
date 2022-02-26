@@ -37,7 +37,7 @@ from amberelectric.model.usage import Usage
 from account_config import AccountConfig
 from invoice import LineItem, Invoice
 from sites import get_site
-from tariff import Tariff
+from tariff import Tariff, TariffComponent
 from usage import stream_usage_data
 from util import setup_stderr_logging, read_api_token_from_file, check_python_version, RUNTIME_ERROR_STATUS, \
     year_month, last_year_month, INVALID_FILE_FORMAT_STATUS, YearMonth, TariffCalendar, read_and_convert_property
@@ -104,7 +104,8 @@ def main():
     amber_fee_dollars_inc_gst: float = read_and_convert_property(
         "Account Config", account_config_json, "amberMonthlyFeeInDollarsIncGst", {float, int}, "must be a number")
 
-    amber_fee_cents_ex_gst = round(amber_fee_dollars_inc_gst * 100 / 1.1)  # Remove GST
+    smart_meter_access_charge_cents_per_day: float = read_and_convert_property(
+        "Account Config", account_config_json, "smartMeterAccessChargeCentsPerDay", {float, int}, "must be a number")
 
     tariff_files_by_channel_type = read_and_convert_property(
         "Account Config", account_config_json, "tariffsByChannelType", {dict},
@@ -128,29 +129,36 @@ def main():
     calendar = TariffCalendar(public_holiday_patterns)
 
     account_config = AccountConfig(account_timezone, calendar, greenpower_active, feed_in_active,
-                                   marginal_loss_factor, amber_fee_dollars_inc_gst)
+                                   marginal_loss_factor, amber_fee_dollars_inc_gst,
+                                   smart_meter_access_charge_cents_per_day)
     other_charges = Tariff(other_charges_json, account_config)
 
-    tariff_by_channel_type = dict()
-    for ct, tariff_desc in tariff_files_by_channel_type.items():
+    tariff_by_channel_type: Dict[str, Tariff] = dict()
+    for channel_type_string, tariff_desc in tariff_files_by_channel_type.items():
         filename = "data/tariffs/" + tariff_desc
         with open(filename) as file_in:
-            tariff_by_channel_type[ct] = Tariff(json5.load(file_in), account_config)
+            tariff_by_channel_type[channel_type_string] = Tariff(json5.load(file_in), account_config)
         logging.info(f"   Loaded tariff from {filename}")
 
-    months = sorted(args.months)
+    # Add a Tariff Component for Smart Meter charges
+    if ChannelType.GENERAL.value in tariff_by_channel_type and account_config.smart_meter_access_charge_cents_per_day:
+        tariff_by_channel_type[ChannelType.GENERAL.value].components.append(TariffComponent({
+            "amberLabel": "Metering Charge (Smart Meter)",
+            "centsPerDay": account_config.smart_meter_access_charge_cents_per_day
+        }, account_config))
+
+    months = sorted(set(args.months))
 
     invoices: Dict[YearMonth, Invoice] = dict()
 
     for month in months:
         invoices[month] = calculate_invoice(client, site, month, tariff_by_channel_type, other_charges,
-                                            amber_fee_dollars_inc_gst, amber_fee_cents_ex_gst)
+                                            account_config)
 
     print_invoices(invoices)
 
 
-def calculate_invoice(client, site, month, tariff_by_channel_type, other_charges, amber_fee_dollars_inc_gst,
-                      amber_fee_cents_ex_gst):
+def calculate_invoice(client, site, month, tariff_by_channel_type, other_charges, account_config):
     logging.info(f"Calculating invoice for {month}")
     usages: List[Usage] = list(stream_usage_data(client, site.id, month.first_date(), month.last_date()))
     general_usages: List[Usage] = list(filter(lambda u: u.channel_type == ChannelType.GENERAL, usages))
@@ -175,13 +183,13 @@ def calculate_invoice(client, site, month, tariff_by_channel_type, other_charges
             general_tariff.get_fee_lines_for(month, general_usages,
                                              lambda tc: tc.per_peak_demand_kw_per_day_price_cents)
     daily_fees = invoice["Daily Supply Fees"] = []
-    # TODO: Metering charges not matching the bill. Why?
-    #  https://github.com/amberelectric/public-api/discussions/50#discussioncomment-2235337
     daily_fees += general_tariff.get_fee_lines_for(month, general_usages, lambda tc: tc.per_day_price_cents)
     daily_fees += controlled_tariff.get_fee_lines_for(month, controlled_usages, lambda tc: tc.per_day_price_cents)
+
+    amber_fee_cents_ex_gst = round(account_config.amber_fee_dollars_inc_gst * 100 / 1.1)  # Remove GST
     days = month.total_days()
     invoice["Amber Fees"] = [
-        LineItem(f"Amber - ${amber_fee_dollars_inc_gst} per month", days, amber_fee_cents_ex_gst / days,
+        LineItem(f"Amber - ${account_config.amber_fee_dollars_inc_gst} per month", days, amber_fee_cents_ex_gst / days,
                  amber_fee_cents_ex_gst)
     ]
     if feed_in_usages:
@@ -198,6 +206,7 @@ def calculate_invoice(client, site, month, tariff_by_channel_type, other_charges
 
 
 def print_invoices(invoices):
+    # Print the detail of each invoice
     for month, invoice in invoices.items():
         print("\n" + ("-" * 80))
         print(f"Month: {month}")
@@ -212,7 +221,15 @@ def print_invoices(invoices):
         solar_credits = -invoice["Your Export Credits"][0].total_cost if "Your Export Credits" in invoice else 0
         gst_cents = round((total_cents - solar_credits) * 0.1)  # No GST on exports
         total_cents = total_cents + gst_cents
+        invoice["total_cents"] = total_cents
         print(f"\n   TOTAL (incl. GST): ${total_cents / 100:7.2f}\n")
+
+    # Print the total of each invoice on one line
+    if len(invoices) > 1:
+        print("\n" + ("-" * 80))
+        for month, invoice in invoices.items():
+            print(f"{month}: ${invoice['total_cents'] / 100:7.2f}")
+        print()
 
 
 if __name__ == '__main__':

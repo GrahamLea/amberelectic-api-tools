@@ -13,4 +13,5 @@
   otherCharges: "2021-2022/nsw.json5",
   amberMonthlyFeeInDollarsIncGst: 10,
   marginalLossFactor: 1.0015, // From https://bit.ly/3JRJxsb - need to know your TNI
+  smartMeterAccessChargeCentsPerDay: 39.726, // See https://bit.ly/3snfkeu
 }

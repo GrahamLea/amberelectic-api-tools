@@ -53,11 +53,12 @@
       amberLabel: "Metering Charge",
       centsPerDay: 4.5918
     },
-    {
-      dnspLabel: "Metering Service Charge - Generation Systems",
-      amberLabel: "Metering Charge (Feed-In)",
-      feedInFilter: true,
-      centsPerDay: 3.1944 // = 0.830 + 2.3644
-    },
+//  This charge not applied with a smart meter: https://bit.ly/3hlac49
+//    {
+//      dnspLabel: "Metering Service Charge - Generation Systems",
+//      amberLabel: "Metering Charge (Feed-In)",
+//      feedInFilter: true,
+//      centsPerDay: 3.1944 // = 0.830 + 2.3644
+//    },
   ]
 }
