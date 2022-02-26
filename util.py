@@ -20,13 +20,12 @@
 # WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import logging
-import re
 import sys
 from datetime import date, timedelta
-from logging import INFO
+from logging import INFO, DEBUG
 from pathlib import Path
 from re import Pattern
-from typing import List, Iterable, TypeVar
+from typing import List, Iterable, TypeVar, Optional, Callable, Any
 
 T = TypeVar("T")
 
@@ -116,8 +115,8 @@ FRIDAY_ISO_WEEKDAY = 5
 class TariffCalendar:
     public_holiday_patterns: List[Pattern]
 
-    def __init__(self, public_holiday_patterns: List[str]) -> None:
-        self.public_holiday_patterns = [re.compile(p) for p in public_holiday_patterns]
+    def __init__(self, public_holiday_patterns: List[Pattern]) -> None:
+        self.public_holiday_patterns = public_holiday_patterns
 
     def is_working_weekday(self, dt: date) -> bool:
         if dt.isoweekday() > FRIDAY_ISO_WEEKDAY:
@@ -151,6 +150,7 @@ def setup_stderr_logging():
     stderr_handler = logging.StreamHandler(sys.stderr)
     stderr_handler.setFormatter(logging.Formatter())
     logging.root.setLevel(INFO)
+    logging.root.setLevel(DEBUG)
     logging.root.addHandler(stderr_handler)
 
 
@@ -158,3 +158,22 @@ def check_python_version():
     # It might work with earlier versions, but I haven't tested
     if sys.version_info[0] < 3 or (sys.version_info[0] == 3 and sys.version_info[1] < 9):
         raise Exception("You must be using Python 3.9+ to run this tool.")
+
+
+def read_and_convert_property(file_description: str, json_data: dict, property_name: str, allowed_types: set,
+                              additional_msg: str, converter: Optional[Callable[[Any], Any]] = None):
+    value = json_data.get(property_name)
+    if value is None or not any((isinstance(value, t) for t in allowed_types)):
+        logging.critical(
+            f"ERROR: '{property_name}' must be in the {file_description} and {additional_msg}.")
+        exit(INVALID_FILE_FORMAT_STATUS)
+
+    if converter:
+        try:
+            value = converter(value)
+        except:
+            logging.critical(
+                f"ERROR: '{property_name}' must be in the {file_description} and {additional_msg}.")
+            exit(INVALID_FILE_FORMAT_STATUS)
+
+    return value

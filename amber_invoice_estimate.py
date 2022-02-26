@@ -22,129 +22,25 @@
 
 import argparse
 import logging
+import re
 import sys
 import traceback
-from typing import List, Dict, Optional, Callable, TypeVar
+from typing import List, Dict
 from zoneinfo import ZoneInfo
 
 import amberelectric
 import json5
 from amberelectric.api import amber_api, AmberApi
 from amberelectric.model.channel import ChannelType
-from amberelectric.model.tariff_information import PeriodType
 from amberelectric.model.usage import Usage
 
+from account_config import AccountConfig
+from invoice import LineItem, Invoice
 from sites import get_site
+from tariff import Tariff
 from usage import stream_usage_data
 from util import setup_stderr_logging, read_api_token_from_file, check_python_version, RUNTIME_ERROR_STATUS, \
-    year_month, last_year_month, INVALID_FILE_FORMAT_STATUS, CANT_CONTINUE_STATUS, YearMonth, TariffCalendar
-
-T = TypeVar("T")
-
-
-class LineItem:
-    def __init__(self, label: str, amount: float, unit_price: float, total_cost_cents: int):
-        self.label = label
-        self.amount_used = amount
-        self.unit_price = unit_price
-        self.total_cost = total_cost_cents
-
-
-Invoice = Dict[str, List[LineItem]]
-
-
-def create_usage_filter(component_json: dict, filter_property_name: str, filter_type_constructor: Callable[[str], T],
-                        usage_attribute_selector: Callable[[Usage], T]) \
-        -> Optional[Callable[[Usage], T]]:
-    if filter_property_name in component_json:
-        filter_texts = component_json[filter_property_name]
-        if not isinstance(filter_texts, list):
-            raise ValueError(f"'{filter_property_name}' in a tariff component must be a list of values")
-        # TODO: Validate the types of the values
-        filter_vals = {filter_type_constructor(f) for f in filter_texts}
-        return lambda usage: usage_attribute_selector(usage) in filter_vals
-    else:
-        return None
-
-
-class TariffComponent:
-    dnsp_label: Optional[str]
-    amber_label: str
-    period_filter: Optional[Callable[[Usage], bool]]
-    channel_type_filter: Optional[Callable[[Usage], bool]]
-    hour_filter: Optional[Callable[[Usage], bool]]
-    working_weekday_filter: Optional[Callable[[Usage], bool]]
-    greenpower_filter: Optional[Callable[[bool], bool]]
-    feed_in_filter: Optional[Callable[[bool], bool]]
-    month_filter: Optional[Callable[[int], bool]]
-    per_kwh_price_cents: float
-    per_day_price_cents: float
-    per_peak_demand_kw_per_day_price_cents: float
-
-    def __init__(self, tariff_component_json: dict, account_timezone: ZoneInfo, calendar: TariffCalendar):
-        if "amberLabel" not in tariff_component_json:
-            raise ValueError(
-                "Required property 'amberLabel' not found in tariff component: " + str(tariff_component_json))
-        self.amber_label = tariff_component_json["amberLabel"]
-        self.dnsp_label = tariff_component_json.get("dnspLabel")
-        self.period_filter = create_usage_filter(tariff_component_json, "periodFilter", PeriodType.from_str,
-                                                 lambda usage: usage.tariff_information.period)
-        self.channel_type_filter = create_usage_filter(tariff_component_json, "channelTypeFilter", ChannelType.from_str,
-                                                       lambda usage: usage.channel_type)
-        self.hour_filter = create_usage_filter(tariff_component_json, "hourFilter", lambda x: x,
-                                               lambda usage: usage.start_time.astimezone(account_timezone).hour)
-
-        if "workingWeekdayFilter" in tariff_component_json:
-            working_weekday_filter_val = tariff_component_json["workingWeekdayFilter"]
-            self.working_weekday_filter = \
-                lambda usage: calendar.is_working_weekday(usage.date) == working_weekday_filter_val
-        else:
-            self.working_weekday_filter = None
-
-        if "greenPowerFilter" in tariff_component_json:
-            greenpower_pass_val = tariff_component_json["greenPowerFilter"]
-            self.greenpower_filter = lambda greenpower_active: greenpower_active == greenpower_pass_val
-        else:
-            self.greenpower_filter = None
-
-        if "feedInFilter" in tariff_component_json:
-            feed_in_pass_val = tariff_component_json["feedInFilter"]
-            self.feed_in_filter = lambda feed_in_active: feed_in_active == feed_in_pass_val
-        else:
-            self.feed_in_filter = None
-
-        if "monthFilter" in tariff_component_json:
-            month_values = tariff_component_json["monthFilter"]
-            if not (isinstance(month_values, list) and all([isinstance(v, int) for v in month_values])):
-                raise ValueError("'monthFilter' in a tariff component must be a list of months as integers")
-            self.month_filter = lambda month: month in month_values
-        else:
-            self.month_filter = None
-
-        self.per_kwh_price_cents = tariff_component_json.get("centsPerKwh")
-        self.per_day_price_cents = tariff_component_json.get("centsPerDay")
-        self.per_peak_demand_kw_per_day_price_cents = tariff_component_json.get("centsPerPeakDemandKwPerDay")
-
-        if len(list(filter(None, [self.per_kwh_price_cents, self.per_day_price_cents,
-                                  self.per_peak_demand_kw_per_day_price_cents]))) != 1:
-            raise ValueError(
-                "Tariff components should have exactly one of centsPerKwh, centsPerDay, or centsPerPeakDemandKwPerDay")
-
-
-class Tariff:
-    distribution_loss_factor: float
-    components: List[TariffComponent]
-
-    def __init__(self, tariff_json: dict, account_timezone: ZoneInfo, calendar: TariffCalendar):
-        if not isinstance(tariff_json, dict):
-            raise ValueError("Tariff JSON must be an object")
-        components = tariff_json.get("components")
-        if not isinstance(components, list):
-            raise ValueError(
-                "Tariff JSON must contain a property 'components', a list of objects (one for each tariff component)")
-
-        self.distribution_loss_factor = tariff_json.get("distributionLossFactor", 1.0)
-        self.components = [TariffComponent(cj, account_timezone, calendar) for cj in components]
+    year_month, last_year_month, INVALID_FILE_FORMAT_STATUS, YearMonth, TariffCalendar, read_and_convert_property
 
 
 def main():
@@ -172,208 +68,136 @@ def main():
     setup_stderr_logging()
 
     api_token = args.api_token.strip() if args.api_token else read_api_token_from_file(arg_parser)
+
+    amber_configuration = amberelectric.Configuration(access_token=api_token)
+    client: AmberApi = amber_api.AmberApi.create(amber_configuration)
+
     site_id = args.site_id
+    site = get_site(client, site_id)
 
     logging.info(f"Loading config...")
 
+    feed_in_active = ChannelType.FEED_IN in {s.type for s in site.channels}
+    logging.info(f"   Feed-in Active: {feed_in_active}")
+
     try:
-        account_config = json5.load(args.account_config_file)
-        assert isinstance(account_config, dict)
+        account_config_json = json5.load(args.account_config_file)
+        assert isinstance(account_config_json, dict)
         logging.info(f"   Account config loaded from {args.account_config_file.name}")
     except Exception as ex:
         logging.critical("ERROR: The account config file could not be parsed: " + str(ex))
         exit(INVALID_FILE_FORMAT_STATUS)
         raise SystemExit
 
-    timezone_str = account_config.get("timezone")
-    try:
-        account_timezone = ZoneInfo(timezone_str)
-        logging.info(f"   Timezone: {account_timezone.key}")
-    except:
-        account_timezone = None
+    account_timezone: ZoneInfo = read_and_convert_property(
+        "Account Config", account_config_json, "timezone", {str},
+        "must be a valid timezone name, e.g. Australia/Sydney", lambda s: ZoneInfo(s))
 
-    if not account_timezone:
-        logging.critical(
-            "ERROR: 'timezone' must be in the account config with a valid timezone name, e.g. Australia/Sydney")
-        exit(INVALID_FILE_FORMAT_STATUS)
-        raise SystemExit
+    logging.info(f"   Timezone: {account_timezone.key}")
 
-    green_power_active = account_config.get("greenPowerActive")
-    if green_power_active is None or not isinstance(green_power_active, bool):
-        logging.critical("ERROR: 'greenPowerActive' must be in the account config with a value of true or false")
-        exit(INVALID_FILE_FORMAT_STATUS)
-        raise SystemExit
+    greenpower_active: bool = read_and_convert_property(
+        "Account Config", account_config_json, "greenPowerActive", {bool}, "must be true or false")
 
-    marginal_loss_factor = account_config.get("marginalLossFactor")
-    if marginal_loss_factor is None or not isinstance(marginal_loss_factor, float):
-        logging.critical("ERROR: 'marginalLossFactor' must be in the account config with a decimal number value")
-        exit(INVALID_FILE_FORMAT_STATUS)
-        raise SystemExit
+    marginal_loss_factor: float = read_and_convert_property(
+        "Account Config", account_config_json, "marginalLossFactor", {float}, "must be a decimal number")
 
-    amber_fee_dollars_inc_gst = account_config.get("amberMonthlyFeeInDollarsIncGst")
-    if amber_fee_dollars_inc_gst is None or not (
-            isinstance(amber_fee_dollars_inc_gst, float) or isinstance(amber_fee_dollars_inc_gst, int)):
-        logging.critical("ERROR: 'amberFeeIncGst' must be in the account config with a numeric value")
-        exit(INVALID_FILE_FORMAT_STATUS)
-        raise SystemExit
+    amber_fee_dollars_inc_gst: float = read_and_convert_property(
+        "Account Config", account_config_json, "amberMonthlyFeeInDollarsIncGst", {float, int}, "must be a number")
+
     amber_fee_cents_ex_gst = round(amber_fee_dollars_inc_gst * 100 / 1.1)  # Remove GST
 
-    tariff_files_by_channel_type = account_config.get("tariffsByChannelType")
-    if tariff_files_by_channel_type is None or not isinstance(tariff_files_by_channel_type, dict):
-        logging.critical("ERROR: 'tariffsByChannelType' must be in the account config and be an object mapping"
-                         " Channel Type names to tariffs")
-        exit(INVALID_FILE_FORMAT_STATUS)
-        raise SystemExit
+    tariff_files_by_channel_type = read_and_convert_property(
+        "Account Config", account_config_json, "tariffsByChannelType", {dict},
+        "must be an object mapping Channel Type names to tariffs")
 
-    other_charges_desc = account_config["otherCharges"]
-    if other_charges_desc is None or not isinstance(other_charges_desc, str):
-        logging.critical("ERROR: 'otherCharges' must be in the account config and be a string")
-        exit(INVALID_FILE_FORMAT_STATUS)
-        raise SystemExit
+    def read_other_charges(charges_description: str):
+        oc_filename = "data/otherCharges/" + charges_description
+        with open(oc_filename) as oc_file_in:
+            json_content = json5.load(oc_file_in)
+        logging.info(f"   Loaded {oc_filename}")
+        return json_content
 
-    filename = "data/otherCharges/" + other_charges_desc
-    try:
-        with open(filename) as file_in:
-            other_charges_json = json5.load(file_in)
-            public_holiday_patterns = other_charges_json.get("publicHolidayDatePatterns")
-            if public_holiday_patterns is None or not isinstance(public_holiday_patterns, list):
-                logging.critical(
-                    "ERROR: 'publicHolidayDatePatterns' must be in the otherCharges config and be a list of strings")
-                exit(INVALID_FILE_FORMAT_STATUS)
-                raise SystemExit
-            calendar = TariffCalendar(public_holiday_patterns)
-            other_charges = Tariff(other_charges_json, account_timezone, calendar)
-        logging.info(f"   Loaded {filename}")
-    except Exception as ex:
-        logging.critical(f"ERROR: Failed to load or parse {filename}: " + str(ex))
-        exit(CANT_CONTINUE_STATUS)
-        raise SystemExit
+    other_charges_json = read_and_convert_property(
+        "Account Config", account_config_json, "otherCharges", {str},
+        "must be a string referencing file under data/otherCharges", converter=read_other_charges)
+
+    public_holiday_patterns = read_and_convert_property(
+        "Other Charges", other_charges_json, "publicHolidayDatePatterns", {list},
+        "must be a list of date-matching regular expressions", converter=lambda ps: [re.compile(p) for p in ps])
+
+    calendar = TariffCalendar(public_holiday_patterns)
+
+    account_config = AccountConfig(account_timezone, calendar, greenpower_active, feed_in_active,
+                                   marginal_loss_factor, amber_fee_dollars_inc_gst)
+    other_charges = Tariff(other_charges_json, account_config)
 
     tariff_by_channel_type = dict()
     for ct, tariff_desc in tariff_files_by_channel_type.items():
         filename = "data/tariffs/" + tariff_desc
         with open(filename) as file_in:
-            general_tariff = Tariff(json5.load(file_in), account_timezone, calendar)
+            tariff_by_channel_type[ct] = Tariff(json5.load(file_in), account_config)
         logging.info(f"   Loaded tariff from {filename}")
-        tariff_by_channel_type[ct] = general_tariff
 
     months = sorted(args.months)
-
-    amber_configuration = amberelectric.Configuration(access_token=api_token)
-    client: AmberApi = amber_api.AmberApi.create(amber_configuration)
-
-    site = get_site(client, site_id)
 
     invoices: Dict[YearMonth, Invoice] = dict()
 
     for month in months:
-        logging.info(f"Calculating invoice for {month}")
-        usages: List[Usage] = list(stream_usage_data(client, site.id, month.first_date(), month.last_date()))
-        general_usages: List[Usage] = list(filter(lambda u: u.channel_type == ChannelType.GENERAL, usages))
-        controlled_usages: List[Usage] = list(filter(lambda u: u.channel_type == ChannelType.CONTROLLED_LOAD, usages))
-        feed_in_usages: List[Usage] = list(filter(lambda u: u.channel_type == ChannelType.FEED_IN, usages))
-        non_feed_in_usages: List[Usage] = general_usages + controlled_usages
-        feed_in_active = len(feed_in_usages) != 0
+        invoices[month] = calculate_invoice(client, site, month, tariff_by_channel_type, other_charges,
+                                            amber_fee_dollars_inc_gst, amber_fee_cents_ex_gst)
 
-        invoice = invoices[month] = dict()
-        usage_fees = invoice["Usage Fees"] = []
+    print_invoices(invoices)
 
-        general_tariff = tariff_by_channel_type[ChannelType.GENERAL.value]
-        controlled_tariff = tariff_by_channel_type[ChannelType.CONTROLLED_LOAD.value]
 
-        if general_usages:
-            general_wholesale_total_amount_cents = \
-                round(sum([u.kwh * u.spot_per_kwh for u in general_usages])
-                      * general_tariff.distribution_loss_factor
-                      * marginal_loss_factor
-                      / 1.1)  # Remove GST!
-            general_wholesale_total_kwh = sum([u.kwh for u in general_usages])
-            general_per_kwh_average_cost = general_wholesale_total_amount_cents / general_wholesale_total_kwh
-            usage_fees.append(
-                LineItem("General Usage Wholesale", general_wholesale_total_kwh, general_per_kwh_average_cost,
-                         general_wholesale_total_amount_cents)
-            )
+def calculate_invoice(client, site, month, tariff_by_channel_type, other_charges, amber_fee_dollars_inc_gst,
+                      amber_fee_cents_ex_gst):
+    logging.info(f"Calculating invoice for {month}")
+    usages: List[Usage] = list(stream_usage_data(client, site.id, month.first_date(), month.last_date()))
+    general_usages: List[Usage] = list(filter(lambda u: u.channel_type == ChannelType.GENERAL, usages))
+    controlled_usages: List[Usage] = list(filter(lambda u: u.channel_type == ChannelType.CONTROLLED_LOAD, usages))
+    feed_in_usages: List[Usage] = list(filter(lambda u: u.channel_type == ChannelType.FEED_IN, usages))
+    non_feed_in_usages: List[Usage] = general_usages + controlled_usages
 
-        if controlled_usages:
-            controlled_wholesale_total_amount_cents = \
-                round(sum([u.kwh * u.spot_per_kwh for u in controlled_usages])
-                      * controlled_tariff.distribution_loss_factor
-                      * marginal_loss_factor
-                      / 1.1)  # Remove GST!
-            controlled_wholesale_total_kwh = sum([u.kwh for u in controlled_usages])
-            controlled_per_kwh_average_cost = controlled_wholesale_total_amount_cents / controlled_wholesale_total_kwh
-            usage_fees.append(
-                LineItem("Controlled Load Wholesale", controlled_wholesale_total_kwh, controlled_per_kwh_average_cost,
-                         controlled_wholesale_total_amount_cents)
-            )
+    invoice = dict()
+    usage_fees = invoice["Usage Fees"] = []
+    general_tariff = tariff_by_channel_type[ChannelType.GENERAL.value]
+    controlled_tariff = tariff_by_channel_type[ChannelType.CONTROLLED_LOAD.value]
+    if general_usages:
+        usage_fees.append(general_tariff.get_wholesales_fees_for(general_usages, "General Usage Wholesale"))
+    if controlled_usages:
+        usage_fees.append(controlled_tariff.get_wholesales_fees_for(controlled_usages, "Controlled Load Wholesale"))
+    usage_fees += general_tariff.get_fee_lines_for(month, general_usages, lambda tc: tc.per_kwh_price_cents)
+    usage_fees += controlled_tariff.get_fee_lines_for(month, controlled_usages, lambda tc: tc.per_kwh_price_cents)
+    usage_fees += other_charges.get_fee_lines_for(month, non_feed_in_usages, lambda tc: tc.per_kwh_price_cents)
+    # TODO: I don't actually know how/where Amber puts this on the bill
+    if general_usages and any(c.per_peak_demand_kw_per_day_price_cents for c in general_tariff.components):
+        invoice["Peak Demand Fees"] = \
+            general_tariff.get_fee_lines_for(month, general_usages,
+                                             lambda tc: tc.per_peak_demand_kw_per_day_price_cents)
+    daily_fees = invoice["Daily Supply Fees"] = []
+    # TODO: Metering charges not matching the bill. Why?
+    #  https://github.com/amberelectric/public-api/discussions/50#discussioncomment-2235337
+    daily_fees += general_tariff.get_fee_lines_for(month, general_usages, lambda tc: tc.per_day_price_cents)
+    daily_fees += controlled_tariff.get_fee_lines_for(month, controlled_usages, lambda tc: tc.per_day_price_cents)
+    days = month.total_days()
+    invoice["Amber Fees"] = [
+        LineItem(f"Amber - ${amber_fee_dollars_inc_gst} per month", days, amber_fee_cents_ex_gst / days,
+                 amber_fee_cents_ex_gst)
+    ]
+    if feed_in_usages:
+        # Include feed-in specific market charges in the one export line item
+        solar_charges = \
+            sum((sc.total_cost for sc in
+                 other_charges.get_fee_lines_for(month, feed_in_usages, lambda tc: tc.per_kwh_price_cents)))
 
-        if general_usages:
-            for component in (c for c in general_tariff.components if c.per_kwh_price_cents):
-                if line_item := create_line_for_component(component.amber_label, month, component, green_power_active,
-                                                          feed_in_active, account_timezone, general_usages):
-                    usage_fees.append(line_item)
-
-        if controlled_usages:
-            for component in (c for c in controlled_tariff.components if c.per_kwh_price_cents):
-                if line_item := create_line_for_component(component.amber_label, month, component, green_power_active,
-                                                          feed_in_active, account_timezone, controlled_usages):
-                    usage_fees.append(line_item)
-
-        for component in (c for c in other_charges.components if c.per_kwh_price_cents):
-            if line_item := create_line_for_component(component.amber_label, month, component, green_power_active,
-                                                      feed_in_active, account_timezone, non_feed_in_usages):
-                usage_fees.append(line_item)
-
-        # TODO: I don't actually know how/where Amber puts this on the bill
-        demand_components = [c for c in general_tariff.components if c.per_peak_demand_kw_per_day_price_cents]
-        if general_usages and demand_components:
-            demand_fees = invoice["Peak Demand Fees"] = []
-            for component in demand_components:
-                if line_item := create_line_for_component(component.amber_label, month, component, green_power_active,
-                                                          feed_in_active, account_timezone, general_usages):
-                    demand_fees.append(line_item)
-
-        daily_fees = invoice["Daily Supply Fees"] = []
-        # TODO: Metering charges not matching the bill. Why?
-        #  https://github.com/amberelectric/public-api/discussions/50#discussioncomment-2235337
-        if general_usages:
-            for component in (c for c in general_tariff.components if c.per_day_price_cents):
-                if line_item := create_line_for_component(component.amber_label, month, component, green_power_active,
-                                                          feed_in_active, account_timezone, general_usages):
-                    daily_fees.append(line_item)
-
-        if controlled_usages:
-            for component in (c for c in controlled_tariff.components if c.per_day_price_cents):
-                if line_item := create_line_for_component(component.amber_label, month, component, green_power_active,
-                                                          feed_in_active, account_timezone, controlled_usages):
-                    daily_fees.append(line_item)
-
-        days = month.total_days()
-        invoice["Amber Fees"] = [
-            LineItem(f"Amber - ${amber_fee_dollars_inc_gst} per month", days, amber_fee_cents_ex_gst / days,
-                     amber_fee_cents_ex_gst)
+        invoice["Your Export Credits"] = [
+            general_tariff.get_wholesales_fees_for(feed_in_usages, "Solar Exports", extra_charges=solar_charges,
+                                                   invert_loss_factor=True, remove_gst=False, negate_total=True)
         ]
+    return invoice
 
-        if feed_in_usages:
-            # NOTE: All Feed-In amounts are calculated as positives, then negated in final line item.
-            export_loss_factor = 1 / (general_tariff.distribution_loss_factor * marginal_loss_factor)
-            export_wholesale_total_amount_cents = \
-                round(sum([u.kwh * u.spot_per_kwh for u in feed_in_usages]) * export_loss_factor)
 
-            # Include feed-in specific market charges in the one export line item
-            for component in (c for c in other_charges.components if c.per_kwh_price_cents):
-                if line_item := create_line_for_component(component.amber_label, month, component, green_power_active,
-                                                          feed_in_active, account_timezone, feed_in_usages):
-                    export_wholesale_total_amount_cents += line_item.total_cost
-
-            export_wholesale_total_kwh = sum([u.kwh for u in feed_in_usages])
-            export_per_kwh_average_cost = \
-                (export_wholesale_total_amount_cents / export_wholesale_total_kwh) if export_wholesale_total_kwh else 0
-            invoice["Your Export Credits"] = [
-                LineItem("Solar Exports", export_wholesale_total_kwh, export_per_kwh_average_cost,
-                         -export_wholesale_total_amount_cents)
-            ]
-
+def print_invoices(invoices):
     for month, invoice in invoices.items():
         print("\n" + ("-" * 80))
         print(f"Month: {month}")
@@ -389,65 +213,6 @@ def main():
         gst_cents = round((total_cents - solar_credits) * 0.1)  # No GST on exports
         total_cents = total_cents + gst_cents
         print(f"\n   TOTAL (incl. GST): ${total_cents / 100:7.2f}\n")
-
-
-def create_line_for_component(label: str, month: YearMonth, component: TariffComponent, greenpower_active: bool,
-                              feed_in_active: bool, account_timezone, base_usages: List[Usage]) \
-        -> Optional[LineItem]:
-    component_name = component.dnsp_label or component.amber_label
-    # TODO: Should be in the component class!
-    if component.greenpower_filter and not component.greenpower_filter(greenpower_active):
-        logging.info(
-            f"    Ignoring component '{component_name}' due to non-matching greenpower active ({greenpower_active})")
-        return None
-    if component.feed_in_filter and not component.feed_in_filter(feed_in_active):
-        logging.info(f"    Ignoring component '{component_name}' due to non-matching feed-in active ({feed_in_active})")
-        return None
-    if component.month_filter and not component.month_filter(month.month):
-        # TODO: Change to debug
-        logging.info(f"    Ignoring component '{component_name}' due to non-matching month ({month.month})")
-        return None
-
-    if component.per_day_price_cents:
-        amount = month.total_days()
-        unit_price = component.per_day_price_cents
-    else:
-        filtered_usages = filter_usages(base_usages, component)
-        if component.per_kwh_price_cents:
-            amount = sum([u.kwh for u in filtered_usages])
-            unit_price = component.per_kwh_price_cents
-        elif component.per_peak_demand_kw_per_day_price_cents:
-            # NOTE: This will break if 5 min windows becomes the default?
-            filtered_usages = filter_usages(base_usages, component)
-            peak_demand_usage = max(filtered_usages, key=lambda u: u.kwh)
-            peak_demand_kw = peak_demand_usage.kwh * 2
-            logging.info(f"    Peak demand for {month} found at "
-                         f"{peak_demand_usage.start_time.astimezone(account_timezone)}"
-                         f" = {peak_demand_usage.kwh} kWh in 30 min = {peak_demand_kw} kW")
-            amount = month.total_days()
-            unit_price = component.per_peak_demand_kw_per_day_price_cents * peak_demand_kw
-        else:
-            raise RuntimeError("TariffComponent doesn't have any known price property")
-
-    total_cost_cents = round(amount * unit_price)
-    return LineItem(label, amount, unit_price, total_cost_cents) if total_cost_cents != 0 else None
-
-
-def filter_usages(base_usages, component):
-    filtered_usages: List[Usage] = base_usages
-    if component.period_filter:
-        filtered_usages: List[Usage] = list(filter(component.period_filter, filtered_usages))
-    if component.channel_type_filter:
-        filtered_usages: List[Usage] = list(filter(component.channel_type_filter, filtered_usages))
-    if component.hour_filter:
-        count_before = len(filtered_usages)
-        filtered_usages: List[Usage] = list(filter(component.hour_filter, filtered_usages))
-        logging.debug(f"    hour_filter: {count_before} -> {len(filtered_usages)}")
-    if component.working_weekday_filter:
-        count_before = len(filtered_usages)
-        filtered_usages: List[Usage] = list(filter(component.working_weekday_filter, filtered_usages))
-        logging.debug(f"    working_weekday_filter: {count_before} -> {len(filtered_usages)}")
-    return filtered_usages
 
 
 if __name__ == '__main__':
