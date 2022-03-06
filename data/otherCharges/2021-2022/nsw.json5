@@ -4,18 +4,21 @@
   // * with an extra publicHolidayDatePatterns section
 
   components: [
+
     // State specific. See https://bit.ly/36yA8am (Read the whole conversation!)
     {
       amberLabel: "Environmental Certificate Cost",
       channelTypeFilter: ["general", "controlledLoad"],
       centsPerKwh: 2.006467
     },
+
     // From my bill. See https://bit.ly/36yA8am (Read the whole thread!)
     {
       amberLabel: "Carbon Neutral Offset 100%",
       channelTypeFilter: ["general", "controlledLoad"],
       centsPerKwh: 0.22
     },
+
     // From my bill. Also available from https://www.amber.com.au/factsheets. Remember to remove GST (divide by 1.1).
     {
       amberLabel: "Greenpower Offset 100%",
@@ -23,18 +26,21 @@
       greenPowerFilter: true,
       centsPerKwh: 3.33
     },
+
     // State specific. See https://bit.ly/36yA8am (Read the whole conversation!)
     {
       amberLabel: "Market Charges",
       channelTypeFilter: ["general", "controlledLoad"],
       centsPerKwh: 0.14528
     },
+
     // State specific. See https://bit.ly/36yA8am (Read the whole conversation!)
     {
       amberLabel: "Market Charges (Embedded Generation Rebate)",
       channelTypeFilter: ["feedIn"],
       centsPerKwh: 0.14794  // NOTE: Positive here, even though it's a rebate paid to the customer
     },
+
     // From my bill. State specific. See https://bit.ly/36yA8am (Read the whole conversation!)
     {
       amberLabel: "Price Protection Hedging",
@@ -46,7 +52,7 @@
     // NOTE: Currently only comprehensively covers 2021-2023 holidays as gazetted by Feb 2022.
     // Source: https://www.industrialrelations.nsw.gov.au/public-holidays/public-holidays-in-nsw/
 
-    // These are regular expressions to match dates that are public holidays.
+    // These are regular expressions to match dates (in yyyy-MM-dd format) that are public holidays.
     //    . = any number in this position
     //    [456] = 4, 5 or 6 in this position
 

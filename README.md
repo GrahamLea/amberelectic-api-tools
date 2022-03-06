@@ -199,14 +199,14 @@ python  amber_spot_price_export.py  2020-07-01  2021-06-30
 ```
 
 
-## Amber Electric Invoice Estimate
+## Amber Electric Invoice Estimate / Tariff Comparison
 
 This is a command line tool that produces a text-based estimate of an Amber 
 Electric customer's invoice for a particular month or months in the past, using
 usage and pricing data from Amber's API.
 
-Once configured, the tool can output an invoice breakdown like this one for any 
-past whole month during which you were an Amber customer:
+*Once configured*, the tool can output an invoice breakdown like this one for 
+any past whole month during which you were an Amber customer:
 
 ```
 Month: 2022-01
@@ -218,8 +218,19 @@ Month: 2022-01
 ...
 ```
 
-The tool has been written to match the format of Amber's most recent invoice
-format as closely as possible.
+The output has been designed to closely match the format of Amber's most recent 
+invoice format.
+
+By running the tool multiple times for the same time period but using different
+tariffs, it's possible to compare the *estimates* for what you would have paid 
+under different tariffs for previous months.
+
+
+### ⚠️ Important Note: This Ain't Official
+
+I'm in no way attached to Amber Electric (except for being a customer).
+This tool has been developed as an amateur, non-vocational exercise effort.
+Amber doesn't endorse this tool, nor support it. 
 
 
 ### ⚠️ Important Note About Accuracy
@@ -232,21 +243,25 @@ The purpose for creating this tool was to enable a rough comparison of
 different DNSP tariffs against historical usage data, and in my own use it 
 appears to be accurate *enough* to serve this purpose.
 
-While no warranty is given about any aspect of these tools, I want to 
-specifically call out that I'm offering ZERO guarantees that the output of this 
-tool is accurate.
+While no warranty is given about any aspect of the tools in this repository, 
+I want to specifically call out that I'm offering ZERO guarantees that the 
+output of this tool is accurate.
 Amber themselves have 
 [published information about some of the reasons that make reproducing bills from API data problematic](https://github.com/amberelectric/public-api/discussions/50). 
+And in relation to this tool they've told me:
+
+> Billing is complicated, and there are a bunch of business rules that you 
+> probably haven’t modelled, so the output may not match a bill exactly.
 
 If you find inaccuracies in the output, and know why they are happening, I'd be
 happy to hear from you in order to improve the tool (and even happier to have 
-you develop and submit a patch after chatting with me about it).
+you develop and submit a patch (after chatting with me about it)).
 See 'Contributions' below.
 
 
 ### ⚠️ Important Note About Limitations
 
-The following limitations are known to exist with the tool:
+The following limitations are _known_ to exist with the tool:
 * There is no handling for block tariffs.
 * There is no handling for capacity pricing.
 * The outputs of demand pricing have not been tested against real bills.
@@ -258,18 +273,18 @@ The following limitations are known to exist with the tool:
 * Only NSW charges have been encoded.
 * Only public holidays in NSW from 2021-2023 have been comprehensively encoded.
 
-There are likely other limitations that are unknown.
+There are likely _other_ limitations that are unknown.
 
 Re-producing a bill requires a lot more data than what is available from the API.
 At a high level, the tariffs you want to use for each channel, the prices that
 make up those tariffs, and other charges specific to your state, your network,
-and even your site's location, all need to be available and accurate to make a
-good estimate.
+and even your site's location, all need to be available and relatively accurate 
+to make a good estimate.
 
 So far, I've only entered this data for scenarios that I've wanted to test.
 This means if you are in NSW, on the Ausgrid network, have an IntelliHub smart
 meter, and are connected to the Sydney South TNI, the tool *might* produce good
-estimates for you.
+estimates for you!
 If you're not part of that small niche, you will probably need to do some data
 acquisition and entry in order to get the tool estimating your own bills.
 
@@ -295,9 +310,10 @@ If you're using tariffs that aren't already encoded in a tariff file, you'll
 need to create a new tariff file.
 The document `data/tariffs/TariffsReadme.md` explains the format for creating
 a tariff file.
-It will probably be easiest to copy an existing one for a similar style of 
-tariff and modify it rather than start from scratch.
-But it shouldn't be too hard.
+It will probably be easiest to copy an existing one for a similar type of 
+tariff (e.g. time of use, demand, controlled load) and modify it rather than 
+start from scratch. But it shouldn't be too hard.
+See below for how to find the data to go in these files.
 
 Lastly, if there isn't an "Other Charges" file for your location under 
 `data/otherCharges`, or it's out of date, you'll need to create one of those.
@@ -309,7 +325,63 @@ Note that, except for the Amber monthly fee, all other tariffs and charges
 should be entered as *exclusive* of GST.
 
 
-### Running
+#### Finding Out Your DNSP
+
+The first thing you'll need to do is figure out who your Distributed Network
+Service Provider (DNSP) is.
+This is sometimes just called your "network" as is the company  who controls
+the poles and wires in your ares.
+It is not the same as your retailer (that would be Amber!).
+
+If you're planning to use these tools, then the easiest way to find out who 
+runs your network will be to 
+[perform a `/sites` query using the Amber API docs](https://app.amber.com.au/developers/#operations-default-get_sites).
+The name of your DNSP appears in the response as the property `network`.
+
+
+#### Finding Out Your Tariffs and Rates
+
+Good news: The `/sites` query response (see above) also contains the codes of 
+your current tariffs!
+
+Bad news: Tariffs are usually made up of a number of different rates/prices that
+apply to different metrics (e.g. energy used, or days in a month) and at 
+different times (e.g. peak vs shoulder vs off-peak, or different months of the 
+year).
+
+Good news: Tariffs are often available online.
+If you google for your DNSP's name, "tariffs", and the current year, you should 
+usually come up with a document that describes your tariffs.
+
+Here's an incomplete list of known tariff documents.
+If you find another one, or one that points to an old link, it'd be great if you 
+could add it and submit a pull request to this README!
+* [Ausgrid: 'Network Price List 2021-2022'](https://www.ausgrid.com.au/-/media/Documents/Regulation/Pricing/PList/AUSGRID-NETWORK-PRICE-LIST-FY2021-22.pdf)
+
+
+#### Finding Out Other Data
+
+Amber have kindly said they'll probably be happy to supply people with extra 
+data they may need to run this tool if they contact their support team at 
+[info@amber.com.au](mailto:info@amber.com.au).
+
+They've also said that they often have busy periods and that in those times 
+requests like this might take a long time for a response, or could even be 
+refused.
+
+I would expect the only data your might need to get from Amber would be:
+* `marginalLossFactor` and `smartMeterAccessChargeCentsPerDay` for your Account 
+  Config file
+* the six `centsPerKwh` items for your state's Other Charges file
+
+I believe most other rates should be able to be easily found on the internet.
+Let's try not to bother Amber with requests for data that we can easily google.
+Taking the time to submit a pull request to this project with any data you get 
+from Amber or from tariff documents that could be useful to other people should 
+help greatly in reducing that load.
+
+
+### Running the Tool
 
 ⚠️ IMPORTANT: If you skipped "Configuration" above, go back and read it, and
 do it!
