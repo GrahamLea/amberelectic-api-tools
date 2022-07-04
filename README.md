@@ -38,28 +38,44 @@ all the files of this project.
 
 ## Pre-Requisites For These Tools
 
-You'll need [Python 3.9+](https://www.python.org/downloads/) installed.
+1. You'll need to know how to use a command-line interface / terminal / PowerShell.
 
-And an Amber API token. (See above)
+2. You'll need an Amber API token. (See above)
+
+3. You'll need [Python 3.9](https://www.python.org/downloads/) (or higher) installed.
+
+If you think you already have Python 3.9+ installed, you can check the version 
+of Python in your path by running:
+```commandline
+python3 -V
+```
+
+If that doesn't work, try:
+```commandline
+python -V
+```
+
+If neither of those works, or neither is Python 3.9 or higher, you'll need to
+[download and install Python](https://www.python.org/downloads/).
 
 
 ## Setup
 
 Using a terminal, in the directory of this project:
 
-1. Create a Python virtual environment with this command:
+1. Create a Python virtual environment with this command. (Note: if 'python3' 
+didn't work above but 'python' did and is v3.9 or higher, just use 'python'):
 ```
-python3.9  -m  venv  venv
-```
-
-2. Start using the virtual environment with this command:
-```
-source  ./venv/bin/activate
+python3  -m  venv  venv
 ```
 
-3. Install the required dependencies with this command:
+2. Install the required dependencies with this command on MacOS or Linux:
 ```
-python  -m  pip  install  -r  requirements.txt
+venv/bin/pip  install  -r  requirements.txt
+```
+or this command on Windows:
+```
+venv\Scripts\pip  install  -r  requirements.txt
 ```
 
 
@@ -70,16 +86,28 @@ The following options are common among all the tools.
 
 ### Help
 
-Run the script with the `-h` option to see its help page:
+Run the script with the `-h` option to see its help page.
+
+On MacOS / Linux:
 ```
-python  SCRIPT_NAME  -h
+venv/bin/python  SCRIPT_NAME  -h
+```
+On Windows:
+```
+venv\Scripts\python  SCRIPT_NAME  -h
 ```
 
 
-### API Token File
+### API Tokens
 
-If you'd prefer not to paste your API token into a terminal command, you can
-save it in a file called `apitoken` in the project's directory.
+All scripts require an Amber API token to be provided.
+There is an `--apitoken`/`-t` option available in each script. 
+
+If you'd prefer _not_ to paste your API token into a terminal command, you can
+save it in a file called `apitoken` (with no extension) in the project's 
+directory.
+All scripts will look for this file and read the API token from it if it exists,
+removing the need for the `--apitoken` option.
 
 
 ### Site Selection
@@ -87,7 +115,7 @@ save it in a file called `apitoken` in the project's directory.
 If you have multiple sites in your Amber Electric account, you'll need to select
 one using the `--site-id` option:
 ```
-python  SCRIPT_NAME  --site-id  SITE_ID_YOU_WANT_DATA_FOR
+venv/bin/python  SCRIPT_NAME  --site-id  SITE_ID_YOU_WANT_DATA_FOR
 ```
 
 
@@ -111,15 +139,17 @@ E4 (GENERAL) Usage (kWh)        ,     20.400,     20.965,     16.011, ...
 
 Using a terminal, in the directory of this project:
 
-1. Start using the virtual environment with this command:
+Run the tool with this command, replacing `YOUR_API_TOKEN` with your own API
+token.
+
+MacOS / Linux:
 ```
-source  ./venv/bin/activate
+venv/bin/python  amber_usage_summary.py  --api-token  YOUR_API_TOKEN  >  my_amber_usage_data.csv
 ```
 
-2. Run the tool with this command, replacing `YOUR_API_TOKEN` with your own API
-token:
+Windows:
 ```
-python  amber_usage_summary.py  --api-token  YOUR_API_TOKEN  >  my_amber_usage_data.csv
+venv\Scripts\python  amber_usage_summary.py  --api-token  YOUR_API_TOKEN  >  my_amber_usage_data.csv
 ```
 
 Using the above, your summary consumption data for the last year will be saved 
@@ -134,7 +164,7 @@ to the file called `my_amber_usage_data.csv` in the same directory.
 By default, the tool just outputs energy consumption data.
 If you also want a summary of your cost data, add the `--include-cost` option:
 ```
-python  amber_usage_summary.py  --include-cost
+venv/bin/python  amber_usage_summary.py  --include-cost
 ```
 
 
@@ -145,7 +175,7 @@ all of the current month's data up until yesterday.
 You can select what date range to include in the output by adding and start date
 and, optionally, an end date to the command.
 ```
-python  amber_usage_summary.py  2020-07-01  2021-06-30
+venv/bin/python  amber_usage_summary.py  2020-07-01  2021-06-30
 ```
 
 
@@ -171,15 +201,16 @@ DATE +10:00, CHANNEL                , 00:00:00, 00:30:00, 01:00:00, ...
 
 Using a terminal, in the directory of this project:
 
-1. Start using the virtual environment with this command:
-```
-source  ./venv/bin/activate
-```
+Run the tool with this command, replacing `YOUR_API_TOKEN` with your own API
+token.
 
-2. Run the tool with this command, replacing `YOUR_API_TOKEN` with your own API
-token:
+On MacOS / Linux:
 ```
-python  amber_spot_price_export.py  --api-token  YOUR_API_TOKEN  >  my_amber_spot_price_data.csv
+venv/bin/python  amber_spot_price_export.py  --api-token  YOUR_API_TOKEN  >  my_amber_spot_price_data.csv
+```
+On Windows:
+```
+venv\Scripts\python  amber_spot_price_export.py  --api-token  YOUR_API_TOKEN  >  my_amber_spot_price_data.csv
 ```
 
 Using the above, your spot price data for the last month will be saved 
@@ -195,7 +226,7 @@ By default, the report includes the last month of data.
 You can select what date range to include in the output by adding a start date
 and, optionally, an end date to the command.
 ```
-python  amber_spot_price_export.py  2020-07-01  2021-06-30
+venv/bin/python  amber_spot_price_export.py  2020-07-01  2021-06-30
 ```
 
 
@@ -390,15 +421,16 @@ in the same part of Sydney as me and are on the same tariff.
 
 Using a terminal, in the directory of this project:
 
-1. Start using the virtual environment with this command:
-```
-source  ./venv/bin/activate
-```
+Run the tool with this command, replacing `YOUR_API_TOKEN` with your own API
+token, and the account config filename with the path of your own account config.
 
-2. Run the tool with this command, replacing `YOUR_API_TOKEN` with your own API
-token, and the account config filename with the path of your own account config:
+On MacOS / Linux:
 ```
-python  amber_invoice_estimate.py  --api-token  YOUR_API_TOKEN  data/accountConfigs/my_account_config_example.json5
+venv/bin/python  amber_invoice_estimate.py  --api-token  YOUR_API_TOKEN  data/accountConfigs/my_account_config_example.json5
+```
+On Windows:
+```
+venv\Scripts\python  amber_invoice_estimate.py  --api-token  YOUR_API_TOKEN  data\accountConfigs\my_account_config_example.json5
 ```
 
 
@@ -412,7 +444,7 @@ month.
 You can select what months to include in the output by listing one or more 
 months as arguments to the script in `yyyy-MM` format: 
 ```
-python  amber_invoice_estimate.py  ACCOUNT_CONFIG_FILE  2021-10  2021-11  2021-12
+venv/bin/python  amber_invoice_estimate.py  ACCOUNT_CONFIG_FILE  2021-10  2021-11  2021-12
 ```
 
 
