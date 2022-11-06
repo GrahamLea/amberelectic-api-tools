@@ -55,8 +55,8 @@ class UsageSummary:
         self.channel_id = initial_record.channelIdentifier
         # noinspection PyTypeChecker
         self.channel_type = initial_record.channel_type
-        self.consumption_kwh = 0.0
-        self.cost_cents = 0.0
+        self.consumption_kwh = initial_record.kwh
+        self.cost_cents = initial_record.cost
 
     def update(self, record: Usage):
         """ Adds the consumption and cost data from the given record to this summary. """
