@@ -230,6 +230,58 @@ venv/bin/python  amber_spot_price_export.py  2020-07-01  2021-06-30
 ```
 
 
+## Amber Electric Solar Export Summary
+
+This is a command line tool that produces a CSV summary of an Amber Electric 
+customer's historical solar exports, including total exports, earnings, and
+average and peak outputs by month.
+
+You simply need to provide your Amber API token, and the tool will output a CSV
+like this for the last year:
+
+```
+                 , 2022-05, 2022-06, 2022-07, ...
+Total kWh        ,   0.137,   6.171,  16.988, ...
+Total Income $   ,   0.000,   0.230,   0.840, ...
+Average Daily kWh,   0.034,   0.213,   0.566, ...
+Peak Daily kWh   ,   0.074,   0.738,   2.161, ...
+Peak Period kW   ,   0.116,   0.438,   0.656, ...
+```
+
+
+### How To Use It
+
+Using a terminal, in the directory of this project:
+
+Run the tool with this command, replacing `YOUR_API_TOKEN` with your own API
+token.
+
+On MacOS / Linux:
+```
+venv/bin/python  amber_solar_export_summary.py  --api-token  YOUR_API_TOKEN  >  my_amber_solar_export_data.csv
+```
+On Windows:
+```
+venv\Scripts\python  amber_solar_export_summary.py  --api-token  YOUR_API_TOKEN  >  my_amber_solar_export_data.csv
+```
+
+Using the above, your solar export summary data for the last year will be saved 
+to the file called `my_amber_solar_export_data.csv` in the same directory.
+
+
+#### Options
+
+
+##### Date Range
+
+By default, the report includes the last 12 full months of data.
+You can select what date range to include in the output by adding a start month
+and, optionally, an end month to the command.
+```
+venv/bin/python  amber_solar_export_summary.py  2020-07  2021-06
+```
+
+
 ## Amber Electric Invoice Estimate / Tariff Comparison
 
 This is a command line tool that produces a text-based estimate of an Amber 

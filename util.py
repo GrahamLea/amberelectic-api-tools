@@ -23,7 +23,7 @@ import logging
 import operator
 import sys
 from datetime import date, timedelta
-from logging import INFO, DEBUG
+from logging import INFO
 from pathlib import Path
 from re import Pattern
 from typing import List, Iterable, TypeVar, Optional, Callable, Any
@@ -86,6 +86,9 @@ class YearMonth:
 
     def total_days(self) -> int:
         return (self.last_date() - self.first_date()).days + 1
+
+    def minus_years(self, years: int) -> 'YearMonth':
+        return YearMonth(self.year - years, self.month)
 
     def __eq__(self, o: object) -> bool:
         return isinstance(o, YearMonth) and o.year == self.year and o.month == self.month
